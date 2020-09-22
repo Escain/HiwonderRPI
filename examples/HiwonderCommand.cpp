@@ -172,12 +172,30 @@ auto main(int num, char* args[]) ->int
 		if (!idOpt) return 1;
 		
 		HiwonderRpi::HiwonderBusServo servo(*idOpt);
-		delay(100);
 
-		std::cout <<  "Getting servo Vin" << static_cast<int>(*idOpt) <<  std::endl;
+		std::cout <<  "Getting servo Vin for " << static_cast<int>(*idOpt) <<  std::endl;
 		
-		auto callback = [](uint16_t val){};
-		servo.vInRead(callback);
+		auto vIn = servo.vinRead();
+		std::cout << "    " << static_cast<float>(vIn)/1000.0f << "V" << std::endl;
+	}
+	else if (command == "read_position")
+	{
+		if (num!=3)
+		{
+			std::cout << "Error: read_position command expect 1 arguments" << std::endl;
+			printHelp();
+			return 1;
+		}
+		
+		auto idOpt = getServoId(argsStr[2],1);
+		if (!idOpt) return 1;
+		
+		HiwonderRpi::HiwonderBusServo servo(*idOpt);
+
+		std::cout <<  "Getting servo Pos for " << static_cast<int>(*idOpt) <<  std::endl;
+		
+		auto pos = servo.posRead();
+		std::cout << "    " << static_cast<float>(pos)*0.24f << "º" << std::endl;
 	}
 	else if (command == "demo")
 	{
