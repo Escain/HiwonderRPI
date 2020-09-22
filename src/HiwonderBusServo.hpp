@@ -20,7 +20,6 @@
 #ifndef HIWONDER_RPI
 #define HIWONDER_RPI
 
-
 #include <array>
 #include <cstdint>
 #include <exception>
@@ -57,11 +56,28 @@ public:
 	/// @arg time: time to reach the target position in ms (if too short, max-speed is used)
 	void moveTimeWrite( int16_t position, uint16_t time=0);
 	
+	/// Read the values set by moveTimeWrite
+	struct MoveTime
+	{
+		uint16_t position;
+		uint16_t time;
+	};
+	MoveTime moveTimeRead() const;
+	
+	///
+	void moveTimeWaitWrite( int16_t position, uint16_t time=0);
+	///
+	MoveTime moveTimeWaitRead() const;
+	///
+	void moveStart();
+	///
+	void moveStop();
+	
 	/// Read the input voltage to the servo, in mV
-	uint16_t vinRead();
+	uint16_t vinRead() const;
 	
 	/// Read the current servo position in multiple of 0.24 deg (1000 = 240deg)
-	uint16_t posRead();
+	uint16_t posRead() const;
 	
 	/// Set the ID of the servo to <newId>
 	///     If the current servo ID is unknown, use broadcast constructor
@@ -226,6 +242,7 @@ const HiwonderBusServo::Buffer& HiwonderBusServo::genericRead( Buffer& buf, uint
 	
 	// Read result
 	const Buffer& res= getMessage();
+	
 	if (!checkMessage(res, buf[4], replySize))
 	{
 		throw std::runtime_error("Corrupted message received");
@@ -265,8 +282,126 @@ void HiwonderBusServo::moveTimeWrite( int16_t position, uint16_t time)
 	
 	sendBuf(buf);
 }
+
+HiwonderBusServo::MoveTime HiwonderBusServo::moveTimeRead() const
+{
+	constexpr static uint8_t MoveTimeReadId = 2;
+	constexpr static uint8_t MoveTimeReadSize = 3;
+	constexpr static uint8_t MoveTimeReplySize = 7;
 	
-uint16_t HiwonderBusServo::vinRead()
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		MoveTimeReadSize,
+		MoveTimeReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, MoveTimeReplySize);
+	
+	MoveTime result;
+	result.position = resultBuf[5]+(resultBuf[6]<<8);
+	result.time = resultBuf[7]+(resultBuf[8]<<8);
+	return result;
+}
+
+void HiwonderBusServo::moveTimeWaitWrite( int16_t position, uint16_t time)
+{
+	constexpr static uint8_t MoveTimeWaitWriteId = 7;
+	constexpr static uint8_t MoveTimeWaitWriteSize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		MoveTimeWaitWriteSize,
+		MoveTimeWaitWriteId,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder
+	};
+	
+	if (position<0) position=0;
+	if (position>1000) position=1000;
+	
+	buf[2] = id;
+	buf[5] = getLowByte(position);
+	buf[6] = getHighByte(position);
+	buf[7] = getLowByte(time);
+	buf[8] = getHighByte(time);
+	buf[9] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
+HiwonderBusServo::MoveTime HiwonderBusServo::moveTimeWaitRead() const
+{
+	constexpr static uint8_t MoveTimeWaitReadId = 8;
+	constexpr static uint8_t MoveTimeWaitReadSize = 3;
+	constexpr static uint8_t MoveTimeWaitReplySize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		MoveTimeWaitReadSize,
+		MoveTimeWaitReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, MoveTimeWaitReplySize);
+	
+	MoveTime result;
+	result.position = resultBuf[5]+(resultBuf[6]<<8);
+	result.time = resultBuf[7]+(resultBuf[8]<<8);
+	return result;
+}
+
+void HiwonderBusServo::moveStart()
+{
+	constexpr static uint8_t MoveStartId = 11;
+	constexpr static uint8_t MoveStartSize = 3;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		MoveStartSize,
+		MoveStartId,
+		_pholder
+	};
+	buf[5] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
+void HiwonderBusServo::moveStop()
+{
+	constexpr static uint8_t MoveStopId = 12;
+	constexpr static uint8_t MoveStopSize = 3;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		MoveStopSize,
+		MoveStopId,
+		_pholder
+	};
+	buf[5] = checksum(buf);
+	
+	sendBuf(buf);
+}
+	
+uint16_t HiwonderBusServo::vinRead() const
 {
 	constexpr static uint8_t VInReadId = 27;
 	constexpr static uint8_t VInReadSize = 3;
@@ -282,12 +417,12 @@ uint16_t HiwonderBusServo::vinRead()
 		_pholder
 	};
 	
-	const Buffer& res = genericRead(buf, VInReplySize);
+	const Buffer& resultBuf = genericRead(buf, VInReplySize);
 	
-	return res[5]+(res[6]<<8);
+	return resultBuf[5]+(resultBuf[6]<<8);
 }
 
-uint16_t HiwonderBusServo::posRead()
+uint16_t HiwonderBusServo::posRead() const
 {
 	constexpr static uint8_t posReadId = 28;
 	constexpr static uint8_t posReadSize = 3;
@@ -303,9 +438,9 @@ uint16_t HiwonderBusServo::posRead()
 		_pholder
 	};
 	
-	const Buffer& res = genericRead(buf, posReplySize);
+	const Buffer& resultBuf = genericRead(buf, posReplySize);
 	
-	return res[5]+(res[6]<<8);
+	return resultBuf[5]+(resultBuf[6]<<8);
 }
 
 void HiwonderBusServo::idWrite(uint8_t newId)

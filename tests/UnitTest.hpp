@@ -18,8 +18,7 @@
  */
 
 #include <iostream>
-#include <memory>
-#include <vector>
+#include <string>
 #include <functional>
 #include <list>
 
@@ -128,7 +127,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 #define UNIT_TEST1(name)                                     \
 	struct name: public TEST                                 \
     {                                                        \
-	    string getName() const override                      \
+	    std::string getName() const override                      \
         { return #name;}                                     \
 	    void run() override;                                 \
 	    REGISTER_CLASS(name)                                 \
@@ -140,7 +139,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 #define UNIT_TEST2(name,Base)                                \
 	struct name: public TEST, public Base                    \
     {                                                        \
-	    string getName() const override                      \
+	    std::string getName() const override                      \
         { return #name;}                                     \
 	    void run() override;                                 \
 	    REGISTER_CLASS(name)                                 \

@@ -30,3 +30,7 @@ include_directories("src")
 # Command-line example
 add_executable("hiwonder" examples/HiwonderCommand.cpp)
 target_link_libraries("hiwonder" "wiringPi")
+
+# Command-line example
+add_executable("ut" tests/ut.cpp)
+target_link_libraries("ut" "wiringPi")
