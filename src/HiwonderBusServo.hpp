@@ -83,6 +83,9 @@ public:
 	///     If the current servo ID is unknown, use broadcast constructor
 	/// @arg newId: the new ID to be set.
 	void idWrite(uint8_t newId);
+	
+	/// Read the id from the servo. This alway uses broadcast (why to read the id if you know it?)
+	uint8_t idRead() const;
 
 private:
 	
@@ -464,6 +467,38 @@ void HiwonderBusServo::idWrite(uint8_t newId)
 	buf[6] = checksum(buf);
 	
 	sendBuf(buf);
+}
+
+uint8_t HiwonderBusServo::idRead() const
+{
+	constexpr static uint8_t idReadId = 14;
+	constexpr static uint8_t idReadSize = 3;
+	constexpr static uint8_t idReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		idReadSize,
+		idReadId,
+		_pholder
+	};
+	
+	buf[2] = 254;
+	buf[buf[3]+2] = checksum(buf);
+	
+	serialFlush(fd);
+	sendBuf(buf);
+	
+	// Read result
+	const Buffer& res= getMessage();
+	if (!checkMessage(res, buf[4], idReplySize))
+	{
+		throw std::runtime_error("Corrupted message received");
+	}
+	
+	return res[5];
 }
 
 }

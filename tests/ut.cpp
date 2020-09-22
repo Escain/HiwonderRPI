@@ -30,7 +30,7 @@ UNIT_TEST(test_can_create_servo_object)
 	ASSERT(!throwed);
 }
 
-UNIT_TEST(moveTimeWrite_and_posRead_matches)
+/*UNIT_TEST(moveTimeWrite_and_posRead_matches)
 {
 	constexpr uint16_t devPos = 20;
 	
@@ -70,7 +70,7 @@ UNIT_TEST(vinRead_return_value_close_standard_voltages)
 	
 	auto res = servo.vinRead();
 	ASSERT(abs(5000-res)<MaxDev || abs(9000-res)<MaxDev || abs(12000-res)<MaxDev);
-}
+}*/
 
 
 // TODO: Those operations don't work yet..
@@ -111,3 +111,30 @@ UNIT_TEST(waiting_move_start_and_stop)
 	ASSERT(abs(servo.posRead()-350)<devPos); // Servo stopped moving
 
 }*/
+
+
+UNIT_TEST(idWrite_and_idRead)
+{
+	{
+		HiwonderRpi::HiwonderBusServo servo(id);
+		
+		auto res = servo.idRead();
+		ASSERT_EQ((int)id, (int)res);
+		
+		servo.idWrite(42);
+		delay(100);
+	}
+	{
+		HiwonderRpi::HiwonderBusServo servo(42);
+		auto res = servo.idRead();
+		ASSERT_EQ((int)42, (int)res);
+		
+		servo.idWrite(id);
+		delay(100);
+	}
+	{
+		HiwonderRpi::HiwonderBusServo servo(id);
+		auto res = servo.idRead();
+		ASSERT_EQ((int)id, (int)res);
+	}
+}
