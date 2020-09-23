@@ -1,3 +1,22 @@
+/*
+ * This file is part of HiwonderRPI library
+ * 
+ * HiwonderRPI is free software: you can redistribute it and/or modify 
+ * it under ther terms of the GNU General Public License as published by 
+ * the Free Software Foundation, either version 3 of the License, or 
+ * (at your option) any later version.
+ * 
+ * HiwonderRPI is distributed in the hope that it will be useful, 
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License 
+ * along with HiwonderRPI. If not, see <https://www.gnu.org/licenses/>.
+ * 
+ * Author: Adrian Maire escain (at) gmail.com
+ */
+
 #include <string>
 #include <unistd.h>
 
@@ -30,19 +49,19 @@ UNIT_TEST(test_can_create_servo_object)
 	ASSERT(!throwed);
 }
 
-/*UNIT_TEST(moveTimeWrite_and_posRead_matches)
+UNIT_TEST(moveTimeWrite_and_posRead_matches)
 {
 	constexpr uint16_t devPos = 20;
 	
 	HiwonderRpi::HiwonderBusServo servo(id);
 	
 	servo.moveTimeWrite(200);
-	delay(1500);
+	delay(3000);
 	auto res = servo.posRead();
 	ASSERT(abs(res-200)<devPos);
 	
 	servo.moveTimeWrite(800);
-	delay(1500);
+	delay(3000);
 	res = servo.posRead();
 	ASSERT(abs(res-800)<devPos);
 }
@@ -70,7 +89,7 @@ UNIT_TEST(vinRead_return_value_close_standard_voltages)
 	
 	auto res = servo.vinRead();
 	ASSERT(abs(5000-res)<MaxDev || abs(9000-res)<MaxDev || abs(12000-res)<MaxDev);
-}*/
+}
 
 
 // TODO: Those operations don't work yet..
@@ -96,19 +115,42 @@ UNIT_TEST(waiting_move_start_and_stop)
 	
 	// set initial position
 	servo.moveTimeWrite(200);
-	delay(1000);
+	delay(3000);
 	ASSERT(abs(servo.posRead()-200)<devPos);
 	// send waiting move
-	servo.moveTimeWaitWrite(500,500);
+	servo.moveTimeWaitWrite(500,1000);
 	delay(100);
 	ASSERT(abs(servo.posRead()-200)<devPos); // Did not started moving
 	// send start
 	servo.moveStart();
-	delay(250);
+	delay(500);
 	ASSERT(abs(servo.posRead()-350)<devPos); // Servo moved to half travel
 	servo.moveStop();
 	delay(250);
 	ASSERT(abs(servo.posRead()-350)<devPos); // Servo stopped moving
+
+}
+
+// NOT WORKING?
+UNIT_TEST(stop_command_apply)
+{
+	constexpr uint16_t devPos = 20;
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	// set initial position
+	servo.moveTimeWrite(0);
+	delay(3000);
+	ASSERT(abs(servo.posRead()-0)<devPos);
+	
+	// send long move
+	servo.moveTimeWrite(1000, 2000);
+	delay(1000);
+	std::cout << (int)servo.posRead() << std::endl;
+	ASSERT(abs(servo.posRead()-500)<4*devPos); // Did started moving
+	
+	servo.moveStop();
+	delay(500);
+	ASSERT(abs(servo.posRead()-500)<4*devPos); // Servo stopped moving
 
 }*/
 
@@ -137,4 +179,27 @@ UNIT_TEST(idWrite_and_idRead)
 		auto res = servo.idRead();
 		ASSERT_EQ((int)id, (int)res);
 	}
+}
+
+UNIT_TEST(angle_offset_adjust)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	// ensure zero at begining
+	servo.angleOffsetAdjust(0);
+	
+	auto res = servo.angleOffsetRead();
+	ASSERT_EQ((int)res, 0);
+	
+	servo.angleOffsetAdjust(100);
+	res = servo.angleOffsetRead();
+	ASSERT_EQ((int)res, 100);
+	delay(500);
+	
+	servo.angleOffsetAdjust(-100);
+	res = servo.angleOffsetRead();
+	ASSERT_EQ((int)res, -100);
+	delay(500);
+	
+	servo.angleOffsetAdjust(0);
 }

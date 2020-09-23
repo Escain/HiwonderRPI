@@ -77,7 +77,8 @@ public:
 	uint16_t vinRead() const;
 	
 	/// Read the current servo position in multiple of 0.24 deg (1000 = 240deg)
-	uint16_t posRead() const;
+	/// Note: the servo can be easily 0.5deg away of it command, that way it can be in negative angle.
+	int16_t posRead() const;
 	
 	/// Set the ID of the servo to <newId>
 	///     If the current servo ID is unknown, use broadcast constructor
@@ -86,6 +87,15 @@ public:
 	
 	/// Read the id from the servo. This alway uses broadcast (why to read the id if you know it?)
 	uint8_t idRead() const;
+	
+	/// The angle offset is an adjustment on the position (homing).
+	/// This function set (volatile memory until servo reset) this angle adjustment.
+	/// @arg angle: Absolute adjustment, in multiples of 0.24deg, 0 is the central position.
+	void angleOffsetAdjust( int8_t angle );
+	/// Return the current offset angle
+	int8_t angleOffsetRead() const;
+	/// Save permanently(over reset, in flash memory) the current offset in the servo.
+	void angleOffsetWrite();
 
 private:
 	
@@ -173,7 +183,7 @@ const HiwonderBusServo::Buffer& HiwonderBusServo::getMessage() const
 {
 	static Buffer res;
 	
-	constexpr static size_t MaxBusyLoop = 5000;
+	constexpr static size_t MaxBusyLoop = 20000;
 	
 	// To avoid timeout (too long), poll until we get enough bytes
 	for(size_t i=0; i<MaxBusyLoop && serialDataAvail(fd)<4; ++i) continue; //noop
@@ -425,7 +435,7 @@ uint16_t HiwonderBusServo::vinRead() const
 	return resultBuf[5]+(resultBuf[6]<<8);
 }
 
-uint16_t HiwonderBusServo::posRead() const
+int16_t HiwonderBusServo::posRead() const
 {
 	constexpr static uint8_t posReadId = 28;
 	constexpr static uint8_t posReadSize = 3;
@@ -448,7 +458,7 @@ uint16_t HiwonderBusServo::posRead() const
 
 void HiwonderBusServo::idWrite(uint8_t newId)
 {
-	constexpr static uint8_t IdWrite = 13;
+	constexpr static uint8_t IdWriteId = 13;
 	constexpr static uint8_t IdWriteSize = 4;
 	
 	static Buffer buf
@@ -457,7 +467,7 @@ void HiwonderBusServo::idWrite(uint8_t newId)
 		FrameHeader,
 		_pholder,
 		IdWriteSize,
-		IdWrite,
+		IdWriteId,
 		_pholder,
 		_pholder
 	};
@@ -499,6 +509,71 @@ uint8_t HiwonderBusServo::idRead() const
 	}
 	
 	return res[5];
+}
+
+void HiwonderBusServo::angleOffsetAdjust( int8_t angleDelta )
+{
+	constexpr static uint8_t AngleOffsetAdjustId = 17;
+	constexpr static uint8_t AngleOffsetAdjustSize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		AngleOffsetAdjustSize,
+		AngleOffsetAdjustId,
+		_pholder,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = static_cast<uint8_t>(angleDelta);
+	buf[6] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
+int8_t HiwonderBusServo::angleOffsetRead() const
+{
+	constexpr static uint8_t AngleOffsetReadId = 19;
+	constexpr static uint8_t AngleOffsetReadSize = 3;
+	constexpr static uint8_t AngleOffsetReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		AngleOffsetReadSize,
+		AngleOffsetReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, AngleOffsetReplySize);
+	
+	return static_cast<int8_t>(resultBuf[5]);
+}
+
+void HiwonderBusServo::angleOffsetWrite()
+{
+	constexpr static uint8_t AngleOffsetWriteId = 18;
+	constexpr static uint8_t AngleOffsetWriteSize = 3;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		AngleOffsetWriteSize,
+		AngleOffsetWriteId,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = checksum(buf);
+	
+	sendBuf(buf);
 }
 
 }
