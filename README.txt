@@ -8,23 +8,32 @@ How to use:
 
 sudo apt-get install git g++ cmake wiringpi
 
-2) Download the project
+2) Make sure UART is activated on your RPI
 
-mkdir hiwonder_rpi
-cd hiwonder_rpi
-git clone https://github.com/Escain/HiwonderRPI
-cd ..
+$ sudo raspi-config
+    5 Interfacing Options
+    P6 Serial
+    login shell to be accessible over serial? <NO>
+    Serial Port Hardware? <YES>
+    <Finish>
 
-3) Configure the project
+3) Download the project
 
-mkdir build_hiwonder_rpi
-cd build_hiwonder_rpi
-cmake ../hiwonder_rpi
+$ mkdir hiwonder_rpi
+$ cd hiwonder_rpi
+$ git clone https://github.com/Escain/HiwonderRPI
+$ cd ..
 
-4) Build the project:
+4) Configure the project
 
-make
+$ mkdir build_hiwonder_rpi
+$ cd build_hiwonder_rpi
+$ cmake ../hiwonder_rpi
 
-5) Test something
+5) Build the project:
 
-./hiwonder
+$ make
+
+6) Test something
+
+$ sudo ./hiwonder
