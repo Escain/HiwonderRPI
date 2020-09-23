@@ -40,6 +40,18 @@ class HiwonderBusServo
 	using Buffer = std::array<uint8_t,10>;
 	
 public:
+	struct MoveTime
+	{
+		uint16_t position;
+		uint16_t time;
+	};
+	
+	struct Limit
+	{
+		int16_t minLimit=0;
+		int16_t maxLimit=1000;
+	};
+	
 	/// Constructor, accept the servo ID. 
 	/// Id=254 is the broadcast ID
 	HiwonderBusServo( uint8_t id=254 );
@@ -57,21 +69,17 @@ public:
 	void moveTimeWrite( int16_t position, uint16_t time=0);
 	
 	/// Read the values set by moveTimeWrite
-	struct MoveTime
-	{
-		uint16_t position;
-		uint16_t time;
-	};
 	MoveTime moveTimeRead() const;
 	
-	///
-	void moveTimeWaitWrite( int16_t position, uint16_t time=0);
-	///
-	MoveTime moveTimeWaitRead() const;
-	///
-	void moveStart();
-	///
-	void moveStop();
+	/// Those functions aren't yet implemented in the servo?
+		///
+		void moveTimeWaitWrite( int16_t position, uint16_t time=0);
+		///
+		MoveTime moveTimeWaitRead() const;
+		///
+		void moveStart();
+		///
+		void moveStop();
 	
 	/// Read the input voltage to the servo, in mV
 	uint16_t vinRead() const;
@@ -92,10 +100,37 @@ public:
 	/// This function set (volatile memory until servo reset) this angle adjustment.
 	/// @arg angle: Absolute adjustment, in multiples of 0.24deg, 0 is the central position.
 	void angleOffsetAdjust( int8_t angle );
+	
 	/// Return the current offset angle
 	int8_t angleOffsetRead() const;
+	
 	/// Save permanently(over reset, in flash memory) the current offset in the servo.
 	void angleOffsetWrite();
+	
+	/// Set (persistently over shutdown) angle limits; movements are limited to them.
+	/// @arg minLimit: minimal angle in [0,999]
+	/// @arg maxLimit: maximal angle in [minLimit+1, 1000]
+	void angleLimitWrite( int16_t minLimit, int16_t maxLimit);
+	
+	/// Retrieve current angle limits
+	Limit angleLimitRead() const;
+	
+	/// Set (persistently over shutdown) voltage limits; Outside, the servo will output no torque
+	///     and the LED will blink for warnings (if configured/available).
+	/// @arg minLimit: minimal voltage in [4500,11999]
+	/// @arg maxLimit: maximal voltage in [minLimit+1, 12000]
+	void vinLimitWrite( int16_t minLimit, int16_t maxLimit);
+	
+	/// Retrieve current voltage limits
+	Limit vinLimitRead() const;
+	
+	/// Set (persistently over shutdown) temperature limits; Outside, the servo will output no torque
+	///     and the LED will blink for warnings (if configured/available).
+	/// @arg maxTemp: maximum temperature in [50, 100]
+	void tempMaxLimitWrite( uint8_t maxTemp=85);
+	
+	/// Retrieve current max temperature limit
+	uint8_t tempMaxLimitRead() const;
 
 private:
 	
@@ -139,8 +174,6 @@ private:
 	int fd = -1;
 	// Id of the servo
 	int id = 1;
-
-	
 };
 
 
@@ -163,7 +196,7 @@ uint8_t HiwonderBusServo::getHighByte( const uint16_t in)
 uint8_t HiwonderBusServo::checksum(const Buffer& buf)
 {
 	uint16_t temp = 0;
-	for (size_t i=2; i<buf[3]+2; ++i)
+	for (size_t i=2; i<buf[3]+2u; ++i)
 	{
 		temp += buf[i];
 	}
@@ -173,7 +206,7 @@ uint8_t HiwonderBusServo::checksum(const Buffer& buf)
 
 void HiwonderBusServo::sendBuf(const Buffer& buf) const
 {
-	for (size_t i=0; i< buf[3]+3; ++i)
+	for (size_t i=0; i< buf[3]+3u; ++i)
 	{
 		serialPutchar(fd, buf[i]);
 	}
@@ -210,7 +243,7 @@ const HiwonderBusServo::Buffer& HiwonderBusServo::getMessage() const
 		return res;
 	}
 	
-	for (size_t i=0; i<res[3]-1; ++i)
+	for (size_t i=0; i<res[3]-1u; ++i)
 	{
 		res[i+4] = serialGetchar(fd);
 	}
@@ -534,6 +567,27 @@ void HiwonderBusServo::angleOffsetAdjust( int8_t angleDelta )
 	sendBuf(buf);
 }
 
+void HiwonderBusServo::angleOffsetWrite()
+{
+	constexpr static uint8_t AngleOffsetWriteId = 18;
+	constexpr static uint8_t AngleOffsetWriteSize = 3;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		AngleOffsetWriteSize,
+		AngleOffsetWriteId,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
 int8_t HiwonderBusServo::angleOffsetRead() const
 {
 	constexpr static uint8_t AngleOffsetReadId = 19;
@@ -555,25 +609,167 @@ int8_t HiwonderBusServo::angleOffsetRead() const
 	return static_cast<int8_t>(resultBuf[5]);
 }
 
-void HiwonderBusServo::angleOffsetWrite()
+void HiwonderBusServo::angleLimitWrite( int16_t minLimit, int16_t maxLimit)
 {
-	constexpr static uint8_t AngleOffsetWriteId = 18;
-	constexpr static uint8_t AngleOffsetWriteSize = 3;
+	constexpr static uint8_t AngleLimitWriteId = 20;
+	constexpr static uint8_t AngleLimitWriteSize = 7;
 	
 	static Buffer buf
 	{
 		FrameHeader, 
 		FrameHeader,
 		_pholder,
-		AngleOffsetWriteSize,
-		AngleOffsetWriteId,
+		AngleLimitWriteSize,
+		AngleLimitWriteId,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder,
 		_pholder
 	};
 	
+	minLimit = std::max(minLimit,static_cast<int16_t>(0));
+	minLimit = std::min(minLimit,static_cast<int16_t>(999)); // Min cannot be over 999 (<1000)
+	maxLimit = std::min(maxLimit,static_cast<int16_t>(1000));
+	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1)); // Max>min
+	
 	buf[2] = id;
-	buf[5] = checksum(buf);
+	buf[5] = getLowByte(minLimit);
+	buf[6] = getHighByte(minLimit);
+	buf[7] = getLowByte(maxLimit);
+	buf[8] = getHighByte(maxLimit);
+	buf[9] = checksum(buf);
 	
 	sendBuf(buf);
+}
+
+HiwonderBusServo::Limit HiwonderBusServo::angleLimitRead() const
+{
+	constexpr static uint8_t AngleLimitReadId = 21;
+	constexpr static uint8_t AngleLimitReadSize = 3;
+	constexpr static uint8_t AngleLimitReplySize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		AngleLimitReadSize,
+		AngleLimitReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, AngleLimitReplySize);
+	
+	Limit limit;
+	limit.minLimit = resultBuf[5]+(resultBuf[6]<<8);
+	limit.maxLimit = resultBuf[7]+(resultBuf[8]<<8);
+	return limit;
+}
+
+void HiwonderBusServo::vinLimitWrite( int16_t minLimit, int16_t maxLimit)
+{
+	constexpr static uint8_t VinLimitWriteId = 22;
+	constexpr static uint8_t VinLimitWriteSize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		VinLimitWriteSize,
+		VinLimitWriteId,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder
+	};
+	
+	minLimit = std::max(minLimit,static_cast<int16_t>(4500));
+	minLimit = std::min(minLimit,static_cast<int16_t>(11999));
+	maxLimit = std::min(maxLimit,static_cast<int16_t>(12000));
+	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1)); // Max>min
+	
+	buf[2] = id;
+	buf[5] = getLowByte(minLimit);
+	buf[6] = getHighByte(minLimit);
+	buf[7] = getLowByte(maxLimit);
+	buf[8] = getHighByte(maxLimit);
+	buf[9] = checksum(buf);
+	
+	sendBuf(buf);
+}	
+	
+HiwonderBusServo::Limit HiwonderBusServo::vinLimitRead() const
+{
+	constexpr static uint8_t VinLimitReadId = 23;
+	constexpr static uint8_t VinLimitReadSize = 3;
+	constexpr static uint8_t VinLimitReplySize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		VinLimitReadSize,
+		VinLimitReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, VinLimitReplySize);
+	
+	Limit limit;
+	limit.minLimit = resultBuf[5]+(resultBuf[6]<<8);
+	limit.maxLimit = resultBuf[7]+(resultBuf[8]<<8);
+	return limit;
+}	
+	
+void HiwonderBusServo::tempMaxLimitWrite( uint8_t maxTemp)
+{
+	constexpr static uint8_t TempMaxLimitWriteId = 24;
+	constexpr static uint8_t TempMaxLimitWriteSize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		TempMaxLimitWriteSize,
+		TempMaxLimitWriteId,
+		_pholder,
+		_pholder
+	};
+	
+	maxTemp = std::max(maxTemp,static_cast<uint8_t>(50));
+	maxTemp = std::min(maxTemp,static_cast<uint8_t>(100));
+	
+	buf[2] = id;
+	buf[5] = maxTemp;
+	buf[6] = checksum(buf);
+	
+	sendBuf(buf);
+}	
+
+uint8_t HiwonderBusServo::tempMaxLimitRead() const
+{
+	constexpr static uint8_t TempMaxLimitReadId = 25;
+	constexpr static uint8_t TempMaxLimitReadSize = 3;
+	constexpr static uint8_t TempMaxLimitReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		TempMaxLimitReadSize,
+		TempMaxLimitReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, TempMaxLimitReplySize);
+	
+	return resultBuf[5];
 }
 
 }

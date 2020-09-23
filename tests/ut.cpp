@@ -203,3 +203,139 @@ UNIT_TEST(angle_offset_adjust)
 	
 	servo.angleOffsetAdjust(0);
 }
+
+UNIT_TEST(angleLimitWrite_effectively_limit_angle)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	constexpr uint16_t devPos = 20;
+	
+	servo.angleLimitWrite(200,500);
+	
+	servo.moveTimeWrite(0);
+	delay(3000);
+	ASSERT(abs(servo.posRead()-200)<devPos);
+	
+	servo.moveTimeWrite(1000);
+	delay(3000);
+	ASSERT(abs(servo.posRead()-500)<devPos);
+	
+	servo.angleLimitWrite(0,1000);
+}
+
+UNIT_TEST(angleLimitRead_return_same_angleLimitWrite)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.angleLimitWrite(200,500);
+	
+	auto limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 200);
+	ASSERT_EQ(limits.maxLimit, 500);
+	
+	servo.angleLimitWrite(0,1000);
+	
+	limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 0);
+	ASSERT_EQ(limits.maxLimit, 1000);
+}
+
+UNIT_TEST(angleLimitWrite_out_of_limits_is_adjusted)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.angleLimitWrite(-200,2000);
+	
+	auto limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 0);
+	ASSERT_EQ(limits.maxLimit, 1000);
+	
+	servo.angleLimitWrite(1500,500);
+	
+	limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 999);
+	ASSERT_EQ(limits.maxLimit, 1000);
+	
+	servo.angleLimitWrite(500,300);
+	
+	limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 500);
+	ASSERT_EQ(limits.maxLimit, 501);
+	
+	servo.angleLimitWrite(0,1000);
+	
+	limits = servo.angleLimitRead();
+	ASSERT_EQ(limits.minLimit, 0);
+	ASSERT_EQ(limits.maxLimit, 1000);
+}
+
+UNIT_TEST(vinLimit_read_and_write_match)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.vinLimitWrite(5000,6000);
+	
+	auto limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 5000);
+	ASSERT_EQ(limits.maxLimit, 6000);
+	
+	servo.vinLimitWrite(7000,11000);
+	
+	limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 7000);
+	ASSERT_EQ(limits.maxLimit, 11000);
+}
+
+UNIT_TEST(vinLimitWrite_out_of_limits_is_adjusted)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.vinLimitWrite(3000,13000);
+	
+	auto limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 4500);
+	ASSERT_EQ(limits.maxLimit, 12000);
+	
+	servo.vinLimitWrite(13000,7000);
+	
+	limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 11999);
+	ASSERT_EQ(limits.maxLimit, 12000);
+	
+	servo.vinLimitWrite(7000,5000);
+	
+	limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 7000);
+	ASSERT_EQ(limits.maxLimit, 7001);
+	
+	servo.vinLimitWrite(4500,12000);
+	
+	limits = servo.vinLimitRead();
+	ASSERT_EQ(limits.minLimit, 4500);
+	ASSERT_EQ(limits.maxLimit, 12000);
+}
+
+UNIT_TEST(tempLimit_read_and_write_match)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.tempMaxLimitWrite(70);
+	ASSERT_EQ((int)servo.tempMaxLimitRead(), 70);
+	
+	servo.tempMaxLimitWrite(90);
+	ASSERT_EQ((int)servo.tempMaxLimitRead(), 90);
+}
+
+UNIT_TEST(tempMaxLimitWrite_out_of_limits_is_adjusted)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.tempMaxLimitWrite(20);
+	ASSERT_EQ((int)servo.tempMaxLimitRead(), 50);
+	
+	servo.tempMaxLimitWrite(120);
+	ASSERT_EQ((int)servo.tempMaxLimitRead(), 100);
+	
+	servo.tempMaxLimitWrite();
+	ASSERT_EQ((int)servo.tempMaxLimitRead(), 85);
+}
