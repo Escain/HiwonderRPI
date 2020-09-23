@@ -32,7 +32,7 @@ UNIT_TEST(test_have_root_privileges)
 
 UNIT_TEST(message_ensure_servo_id_is_1)
 {
-	std::cerr << "Please, ensure servo is connected with ID="<< 
+	std::cerr << "MESSAGE: Please, ensure servo is connected with ID="<< 
 	    static_cast<int>(id) << std::endl;
 }
 
@@ -338,4 +338,82 @@ UNIT_TEST(tempMaxLimitWrite_out_of_limits_is_adjusted)
 	
 	servo.tempMaxLimitWrite();
 	ASSERT_EQ((int)servo.tempMaxLimitRead(), 85);
+}
+
+UNIT_TEST(tempRead_between_acceptable_limits)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	ASSERT( servo.tempRead() < 100);
+	ASSERT( servo.tempRead() > 10);
+}
+
+
+UNIT_TEST(servoOrMotorMode_read_and_write_match)
+{
+	using Mode = HiwonderRpi::HiwonderBusServo::Mode;
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.servoOrMotorModeWrite(Mode::Motor, 400);
+	delay (1000);
+	auto result = servo.servoOrMotorModeRead();
+	ASSERT_EQ( static_cast<uint8_t>(result.mode), static_cast<uint8_t>(Mode::Motor) );
+	ASSERT_EQ( result.speed, 400);
+	
+	servo.servoOrMotorModeWrite(Mode::Motor, -200);
+	delay (1000);
+	result = servo.servoOrMotorModeRead();
+	ASSERT_EQ( static_cast<uint8_t>(result.mode), static_cast<uint8_t>(Mode::Motor) );
+	ASSERT_EQ( result.speed, -200);
+	
+	servo.servoOrMotorModeWrite(Mode::Servo);
+	result = servo.servoOrMotorModeRead();
+	ASSERT_EQ( static_cast<uint8_t>(result.mode), static_cast<uint8_t>(Mode::Servo) );
+}
+
+UNIT_TEST(loadUnload_read_and_write_match)
+{
+	using LoadMode = HiwonderRpi::HiwonderBusServo::LoadMode;
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.loadOrUnloadWrite(LoadMode::Unload);
+	auto result = servo.loadOrUnloadRead();
+	ASSERT_EQ( static_cast<uint8_t>(result), static_cast<uint8_t>(LoadMode::Unload) );
+	
+	servo.loadOrUnloadWrite(LoadMode::Load);
+	result = servo.loadOrUnloadRead();
+	ASSERT_EQ( static_cast<uint8_t>(result), static_cast<uint8_t>(LoadMode::Load) );
+}
+
+UNIT_TEST(powerLed_read_and_write_match)
+{
+	using PowerLed = HiwonderRpi::HiwonderBusServo::PowerLed;
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.ledCtrlWrite(PowerLed::Off);
+	auto result = servo.ledCtrlRead();
+	ASSERT_EQ( static_cast<uint8_t>(result), static_cast<uint8_t>(PowerLed::Off) );
+	
+	servo.ledCtrlWrite(PowerLed::On);
+	result = servo.ledCtrlRead();
+	ASSERT_EQ( static_cast<uint8_t>(result), static_cast<uint8_t>(PowerLed::On) );
+}
+
+UNIT_TEST(ledError_read_and_write_match)
+{
+	HiwonderRpi::HiwonderBusServo servo(id);
+	
+	servo.ledErrorWrite(true,true,true);
+	auto result = servo.ledErrorRead();
+	ASSERT_EQ(result.overTemperature, true);
+	ASSERT_EQ(result.overVoltage, true);
+	ASSERT_EQ(result.stall, true);
+	
+	servo.ledErrorWrite(false,false,false);
+	result = servo.ledErrorRead();
+	ASSERT_EQ(result.overTemperature, false);
+	ASSERT_EQ(result.overVoltage, false);
+	ASSERT_EQ(result.stall, false);
+
+	servo.ledErrorWrite(true,true,true);
 }

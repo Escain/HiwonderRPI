@@ -169,7 +169,12 @@ int main()
 		const auto& constructor = entry.second;
 		auto* obj = constructor();
 
+		std::cout << "    RUNNING: " << obj->getName() << std::endl;
 		obj->run();
+		if (!obj->isPassed())
+		{
+			std::cout << "FAILED: " << obj->getName() << std::endl;
+		}
 		countPassed += obj->isPassed()?1:0;
 		count++;
 	}

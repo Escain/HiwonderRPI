@@ -95,7 +95,6 @@ std::optional<uint16_t> getServoAngle(const std::string& str, int pos)
 	return angle;
 }
 
-
 /// Print the command help message
 void printHelp()
 {
@@ -106,46 +105,50 @@ void printHelp()
 	"Command list:\n"
 	" - set_middle <id>: Set the servo with id=<id> to it middle position (500)\n"
 	" - move <id> <angle>: Set the servo with id=<id> to it position=<angle> in 0s\n"
-	" - ";
+	" - read_voltage <id>: Return the input voltage for the servo with id=<id>\n"
+	" - read_position <id>: Return the current position of the servo with id=<id>" << std::endl;
+}
+
+bool checkArguments( int num, int exp, const std::string& name )
+{
+	if (num!=exp+2)
+	{
+		std::cout << "Error: " << name << " command expect " << exp << " arguments" << std::endl;
+		printHelp();
+		return false;
+	}
+	return true;
 }
 
 
 /// main function
 auto main(int num, char* args[]) ->int
 {
+	if (1 >= num)
+	{
+		printHelp();
+		return 0;
+	}
+	
 	std::vector<std::string> argsStr;
 	for (int i=0; i< num; ++i) argsStr.push_back( args[i]);
-	
-	
 	const auto& command = argsStr[1];
 
 	if (command=="set_middle")
 	{
-		if (num!=3)
-		{
-			std::cout << "Error: set_middle command expect 1 arguments" << std::endl;
-			printHelp();
-			return 1;
-		}
+		if (!checkArguments(num, 1, "set_middle")) return 1;
 		
 		auto idOpt = getServoId(argsStr[2],1);
 		if (!idOpt) return 1;
 		
 		HiwonderRpi::HiwonderBusServo servo(*idOpt);
 		
-		std::cout <<  "Moving servo " << static_cast<int>(*idOpt) << 
-		    " to it middle (500)" <<  std::endl;
 		servo.moveTimeWrite( 500, 0);
-		delay(1000);
+		delay(1500);
 	}
 	else if (command == "move")
 	{
-		if (num!=4)
-		{
-			std::cout << "Error: move command expect 2 arguments" << std::endl;
-			printHelp();
-			return 1;
-		}
+		if (!checkArguments(num, 2, "move")) return 1;
 		
 		auto idOpt = getServoId(argsStr[2],1);
 		if (!idOpt) return 1;
@@ -154,48 +157,28 @@ auto main(int num, char* args[]) ->int
 		
 		HiwonderRpi::HiwonderBusServo servo(*idOpt);
 
-		std::cout <<  "Moving servo " << static_cast<int>(*idOpt) << 
-		    " to position " <<  *angleOpt <<  std::endl;
 		servo.moveTimeWrite( *angleOpt, 0);
-		delay(1000);
+		delay(3000);
 	}
 	else if (command == "read_voltage")
 	{
-		if (num!=3)
-		{
-			std::cout << "Error: read_voltage command expect 1 arguments" << std::endl;
-			printHelp();
-			return 1;
-		}
+		if (!checkArguments(num, 1, "read_voltage")) return 1;
 		
 		auto idOpt = getServoId(argsStr[2],1);
 		if (!idOpt) return 1;
 		
 		HiwonderRpi::HiwonderBusServo servo(*idOpt);
-
-		std::cout <<  "Getting servo Vin for " << static_cast<int>(*idOpt) <<  std::endl;
-		
-		auto vIn = servo.vinRead();
-		std::cout << "    " << static_cast<float>(vIn)/1000.0f << "V" << std::endl;
+		std::cout << "    " << static_cast<float>(servo.vinRead())/1000.0f << "V" << std::endl;
 	}
 	else if (command == "read_position")
 	{
-		if (num!=3)
-		{
-			std::cout << "Error: read_position command expect 1 arguments" << std::endl;
-			printHelp();
-			return 1;
-		}
+		if (!checkArguments(num, 1, "read_position")) return 1;
 		
 		auto idOpt = getServoId(argsStr[2],1);
 		if (!idOpt) return 1;
 		
 		HiwonderRpi::HiwonderBusServo servo(*idOpt);
-
-		std::cout <<  "Getting servo Pos for " << static_cast<int>(*idOpt) <<  std::endl;
-		
-		auto pos = servo.posRead();
-		std::cout << "    " << static_cast<float>(pos)*0.24f << "º" << std::endl;
+		std::cout << "    " << static_cast<float>(servo.posRead())*0.24f << "º" << std::endl;
 	}
 	else if (command == "demo")
 	{

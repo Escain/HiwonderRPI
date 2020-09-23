@@ -30,11 +30,20 @@
 
 namespace HiwonderRpi
 {
+	
+// Literals
+constexpr uint16_t operator ""_uint16( unsigned long long v) { return static_cast<uint16_t>(v);}
+constexpr int16_t operator ""_int16( unsigned long long v) { return static_cast<int16_t>(v);}
+constexpr uint8_t operator ""_uint8( unsigned long long v) { return static_cast<uint8_t>(v);}
+constexpr int8_t operator ""_int8( unsigned long long v) { return static_cast<int8_t>(v);}
 
 // This class is header-only, for ease of usage.
 
 /// This class represent a Hiwonder servo, and implement
 /// basic UART communication from a Raspberry PI.
+/// For convenience, command names are keep similar to the documentation, but
+///     parameters are in a more user-friendly format than bytes.
+///     Methods in this class and servo commands match 1 to 1.
 class HiwonderBusServo
 {
 	using Buffer = std::array<uint8_t,10>;
@@ -50,6 +59,37 @@ public:
 	{
 		int16_t minLimit=0;
 		int16_t maxLimit=1000;
+	};
+	
+	enum class Mode: uint8_t
+	{
+		Servo = 0,
+		Motor = 1
+	};
+	
+	enum class LoadMode: uint8_t
+	{
+		Unload = 0,
+		Load = 1
+	};
+	
+	enum class PowerLed: uint8_t
+	{
+		Off = 1,
+		On = 0
+	};
+	
+	struct ModeRead
+	{
+		Mode mode=Mode::Servo;
+		int16_t speed = 0;
+	};
+	
+	struct LedError
+	{
+		bool overTemperature;
+		bool overVoltage;
+		bool stall;
 	};
 	
 	/// Constructor, accept the servo ID. 
@@ -80,13 +120,6 @@ public:
 		void moveStart();
 		///
 		void moveStop();
-	
-	/// Read the input voltage to the servo, in mV
-	uint16_t vinRead() const;
-	
-	/// Read the current servo position in multiple of 0.24 deg (1000 = 240deg)
-	/// Note: the servo can be easily 0.5deg away of it command, that way it can be in negative angle.
-	int16_t posRead() const;
 	
 	/// Set the ID of the servo to <newId>
 	///     If the current servo ID is unknown, use broadcast constructor
@@ -131,6 +164,49 @@ public:
 	
 	/// Retrieve current max temperature limit
 	uint8_t tempMaxLimitRead() const;
+	
+	/// Read the current servo temperature in deg celsius
+	uint8_t tempRead() const;
+	
+	/// Read the input voltage to the servo, in mV
+	uint16_t vinRead() const;
+	
+	/// Read the current servo position in multiple of 0.24 deg (1000 = 240deg)
+	/// Note: the servo can be easily 0.5deg away of it command, that way it can be in negative angle.
+	int16_t posRead() const;
+	
+	/// Set (volatile) the mode of the device: Servo or Motor (position or speed)
+	/// In case of motor mode, the speed can be specified: 0=stopped, negative/positive for each direction.
+	/// @arg mode: Servo or Motor
+	/// @arg speed: In case of Motor-mdoe, the speed [-1000,1000]
+	void servoOrMotorModeWrite( Mode mode=Mode::Servo, int16_t speed=0 );
+	
+	/// Read the Servo or Motor mode, and in case of motor, the speed (0 for servo).
+	ModeRead servoOrMotorModeRead() const;
+	
+	/// Set the servo to "Unload":free-rotation (it will not apply torque to keep a position), or 
+	/// "Load": normal mode, where the servo tries to hold a given position
+	/// @arg loadMode: Load or Unload mode to set
+	void loadOrUnloadWrite( LoadMode loadMode = LoadMode::Load );
+	
+	/// Retrieve the Load or Unload mode from the servo
+	LoadMode loadOrUnloadRead() const;
+	
+	/// Set if the Power LED is always ON, or always OFF
+	/// @arg powerLed: On or Off
+	void ledCtrlWrite(PowerLed powerLed = PowerLed::On);
+	
+	/// Read if the Power LED is ON or OFF
+	PowerLed ledCtrlRead() const;
+	
+	/// Set the different errors to be warned by the LED
+	/// @arg overTemperature: if to warn over temperature with the LED
+	/// @arg overVoltage: if to warn over voltage with the LED
+	/// @arg stall: if to warn when the servo is locked/stall with the LED
+	void ledErrorWrite( bool overTemperature=true, bool overVoltage=true, bool stall=true);
+	
+	/// Read the LED errors set
+	LedError ledErrorRead() const;
 
 private:
 	
@@ -446,48 +522,6 @@ void HiwonderBusServo::moveStop()
 	
 	sendBuf(buf);
 }
-	
-uint16_t HiwonderBusServo::vinRead() const
-{
-	constexpr static uint8_t VInReadId = 27;
-	constexpr static uint8_t VInReadSize = 3;
-	constexpr static uint8_t VInReplySize = 5;
-	
-	static Buffer buf
-	{
-		FrameHeader, 
-		FrameHeader,
-		_pholder,
-		VInReadSize,
-		VInReadId,
-		_pholder
-	};
-	
-	const Buffer& resultBuf = genericRead(buf, VInReplySize);
-	
-	return resultBuf[5]+(resultBuf[6]<<8);
-}
-
-int16_t HiwonderBusServo::posRead() const
-{
-	constexpr static uint8_t posReadId = 28;
-	constexpr static uint8_t posReadSize = 3;
-	constexpr static uint8_t posReplySize = 5;
-	
-	static Buffer buf
-	{
-		FrameHeader, 
-		FrameHeader,
-		_pholder,
-		posReadSize,
-		posReadId,
-		_pholder
-	};
-	
-	const Buffer& resultBuf = genericRead(buf, posReplySize);
-	
-	return resultBuf[5]+(resultBuf[6]<<8);
-}
 
 void HiwonderBusServo::idWrite(uint8_t newId)
 {
@@ -628,10 +662,10 @@ void HiwonderBusServo::angleLimitWrite( int16_t minLimit, int16_t maxLimit)
 		_pholder
 	};
 	
-	minLimit = std::max(minLimit,static_cast<int16_t>(0));
-	minLimit = std::min(minLimit,static_cast<int16_t>(999)); // Min cannot be over 999 (<1000)
-	maxLimit = std::min(maxLimit,static_cast<int16_t>(1000));
-	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1)); // Max>min
+	minLimit = std::max(minLimit,0_int16);
+	minLimit = std::min(minLimit,999_int16); // Min cannot be over 999 (<1000)
+	maxLimit = std::min(maxLimit,1000_int16);
+	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1_int16)); // Max>min
 	
 	buf[2] = id;
 	buf[5] = getLowByte(minLimit);
@@ -686,10 +720,10 @@ void HiwonderBusServo::vinLimitWrite( int16_t minLimit, int16_t maxLimit)
 		_pholder
 	};
 	
-	minLimit = std::max(minLimit,static_cast<int16_t>(4500));
-	minLimit = std::min(minLimit,static_cast<int16_t>(11999));
-	maxLimit = std::min(maxLimit,static_cast<int16_t>(12000));
-	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1)); // Max>min
+	minLimit = std::max(minLimit,4500_int16);
+	minLimit = std::min(minLimit,11999_int16);
+	maxLimit = std::min(maxLimit,12000_int16);
+	maxLimit = std::max(maxLimit,static_cast<int16_t>(minLimit+1_int16)); // Max>min
 	
 	buf[2] = id;
 	buf[5] = getLowByte(minLimit);
@@ -741,8 +775,8 @@ void HiwonderBusServo::tempMaxLimitWrite( uint8_t maxTemp)
 		_pholder
 	};
 	
-	maxTemp = std::max(maxTemp,static_cast<uint8_t>(50));
-	maxTemp = std::min(maxTemp,static_cast<uint8_t>(100));
+	maxTemp = std::max(maxTemp,50_uint8);
+	maxTemp = std::min(maxTemp,100_uint8);
 	
 	buf[2] = id;
 	buf[5] = maxTemp;
@@ -770,6 +804,261 @@ uint8_t HiwonderBusServo::tempMaxLimitRead() const
 	const Buffer& resultBuf = genericRead(buf, TempMaxLimitReplySize);
 	
 	return resultBuf[5];
+}
+
+uint8_t HiwonderBusServo::tempRead() const
+{
+	constexpr static uint8_t TempReadId = 26;
+	constexpr static uint8_t TempReadSize = 3;
+	constexpr static uint8_t TempReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		TempReadSize,
+		TempReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, TempReplySize);
+	
+	return resultBuf[5];
+}
+	
+uint16_t HiwonderBusServo::vinRead() const
+{
+	constexpr static uint8_t VInReadId = 27;
+	constexpr static uint8_t VInReadSize = 3;
+	constexpr static uint8_t VInReplySize = 5;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		VInReadSize,
+		VInReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, VInReplySize);
+	
+	return resultBuf[5]+(resultBuf[6]<<8);
+}
+
+int16_t HiwonderBusServo::posRead() const
+{
+	constexpr static uint8_t posReadId = 28;
+	constexpr static uint8_t posReadSize = 3;
+	constexpr static uint8_t posReplySize = 5;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		posReadSize,
+		posReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, posReplySize);
+	
+	return resultBuf[5]+(resultBuf[6]<<8);
+}
+
+void HiwonderBusServo::servoOrMotorModeWrite( Mode mode, int16_t speed )
+{
+	constexpr static uint8_t ServoOrMotorModeWriteId = 29;
+	constexpr static uint8_t ServoOrMotorModeWriteSize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		ServoOrMotorModeWriteSize,
+		ServoOrMotorModeWriteId,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder,
+		_pholder
+	};
+	
+	speed = std::max(speed,static_cast<int16_t>(-1000));
+	speed = std::min(speed,1000_int16);
+	
+	buf[2] = id;
+	buf[5] = static_cast<uint8_t>(mode);
+	buf[6] = 0_uint8;
+	buf[7] = getLowByte(speed);
+	buf[8] = getHighByte(speed);
+	buf[9] = checksum(buf);
+	
+	sendBuf(buf);
+}
+	
+HiwonderBusServo::ModeRead HiwonderBusServo::servoOrMotorModeRead() const
+{
+	constexpr static uint8_t servoOrMotorModeReadId = 30;
+	constexpr static uint8_t servoOrMotorModeReadSize = 3;
+	constexpr static uint8_t servoOrMotorModeReplySize = 7;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		servoOrMotorModeReadSize,
+		servoOrMotorModeReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, servoOrMotorModeReplySize);
+	
+	ModeRead result;
+	result.mode = static_cast<Mode>(resultBuf[5]);
+	result.speed = resultBuf[7]+(resultBuf[8]<<8);
+	return result;
+}
+
+void HiwonderBusServo::loadOrUnloadWrite( LoadMode loadMode )
+{
+	constexpr static uint8_t LoadOrUnloadWriteId = 31;
+	constexpr static uint8_t LoadOrUnloadWriteSize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LoadOrUnloadWriteSize,
+		LoadOrUnloadWriteId,
+		_pholder,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = static_cast<uint8_t>(loadMode);
+	buf[6] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
+HiwonderBusServo::LoadMode HiwonderBusServo::loadOrUnloadRead() const
+{
+	constexpr static uint8_t LoadOrUnloadReadId = 32;
+	constexpr static uint8_t LoadOrUnloadReadSize = 3;
+	constexpr static uint8_t LoadOrUnloadReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LoadOrUnloadReadSize,
+		LoadOrUnloadReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, LoadOrUnloadReplySize);
+	
+	return static_cast<LoadMode>(resultBuf[5]);
+}
+
+void HiwonderBusServo::ledCtrlWrite(PowerLed powerLed)
+{
+	constexpr static uint8_t LedCtrlWriteId = 33;
+	constexpr static uint8_t LedCtrlWriteSize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LedCtrlWriteSize,
+		LedCtrlWriteId,
+		_pholder,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = static_cast<uint8_t>(powerLed);
+	buf[6] = checksum(buf);
+	
+	sendBuf(buf);
+}
+	
+HiwonderBusServo::PowerLed HiwonderBusServo::ledCtrlRead() const
+{
+	constexpr static uint8_t LedCtrlReadId = 34;
+	constexpr static uint8_t LedCtrlReadSize = 3;
+	constexpr static uint8_t LedCtrlReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LedCtrlReadSize,
+		LedCtrlReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, LedCtrlReplySize);
+	
+	return static_cast<PowerLed>(resultBuf[5]);
+}
+
+void HiwonderBusServo::ledErrorWrite( bool overTemperature, bool overVoltage, bool stall)
+{
+	constexpr static uint8_t LedErrorWriteId = 35;
+	constexpr static uint8_t LedErrorWriteSize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LedErrorWriteSize,
+		LedErrorWriteId,
+		_pholder,
+		_pholder
+	};
+	
+	buf[2] = id;
+	buf[5] = static_cast<uint8_t>((overTemperature?0x1:0x0) + (overVoltage?0x2:0x0) + (stall?0x4:0x0));
+	buf[6] = checksum(buf);
+	
+	sendBuf(buf);
+}
+
+HiwonderBusServo::LedError HiwonderBusServo::ledErrorRead() const
+{
+	constexpr static uint8_t LedErrorReadId = 36;
+	constexpr static uint8_t LedErrorReadSize = 3;
+	constexpr static uint8_t LedErrorReplySize = 4;
+	
+	static Buffer buf
+	{
+		FrameHeader, 
+		FrameHeader,
+		_pholder,
+		LedErrorReadSize,
+		LedErrorReadId,
+		_pholder
+	};
+	
+	const Buffer& resultBuf = genericRead(buf, LedErrorReplySize);
+	
+	LedError result;
+	result.overTemperature = resultBuf[5] & 0x1;
+	result.overVoltage = resultBuf[5] & 0x2;
+	result.stall = resultBuf[5] & 0x4;
+	return result;
 }
 
 }
