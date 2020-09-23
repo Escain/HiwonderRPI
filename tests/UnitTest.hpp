@@ -76,7 +76,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 /// ASSERT MACROS
 #define ASSERT(cond)                                         \
 	if( !(cond) )                                            \
-    {                                                        \
+	{                                                        \
 	    std::cout <<  "    " << __LINE__ << " FAIL ASSERT: " \
 	        << getName() << " : " << #cond << std::endl;     \
 	    setFail();                                           \
@@ -85,7 +85,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 
 #define ASSERT_EQ(a,b)                                       \
 	if(a!=b)                                                 \
-    {                                                        \
+	{                                                        \
 	    std::cout << "    " << __LINE__ << " FAIL EQ: "      \
 	        << getName() << " : " << #a << "("<< a <<        \
 	        ") != "<<#b <<"(" <<b<<")" << std::endl;         \
@@ -95,7 +95,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 
 #define ASSERT_NEQ(a,b)                                      \
 	if(a!=b)                                                 \
-    {                                                        \
+	{                                                        \
 	    std::cout << "    " << __LINE__ << " FAIL NEQ: "     \
 	        << getName() << " : " << #a << "("<< a <<        \
 	        ") == "<<#b <<"(" <<b<<")" << std::endl;         \
@@ -107,11 +107,11 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 //*-------------------------------------------------------------------------
 #define REGISTER_CLASS(ClassType)                            \
 	static TEST* createInstance()                            \
-    {                                                        \
+	{                                                        \
 	    return new ClassType();                              \
 	}                                                        \
 	static int initRegistry()                                \
-    {                                                        \
+	{                                                        \
 	    Registry::registerClass(                             \
 	        std::string(#ClassType),                         \
 	        ClassType::createInstance);                      \
@@ -126,11 +126,11 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 /// UNIT_TEST standalone, without base class
 #define UNIT_TEST1(name)                                     \
 	struct name: public TEST                                 \
-    {                                                        \
-	    std::string getName() const override                      \
-        { return #name;}                                     \
-	    void run() override;                                 \
-	    REGISTER_CLASS(name)                                 \
+	{                                                        \
+		std::string getName() const override                 \
+		{ return #name;}                                     \
+		void run() override;                                 \
+		REGISTER_CLASS(name)                                 \
 	};                                                       \
 	DEFINE_REG_CLASS(name)                                   \
     void name::run()
@@ -138,11 +138,11 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 /// UNIT_TEST with base-class
 #define UNIT_TEST2(name,Base)                                \
 	struct name: public TEST, public Base                    \
-    {                                                        \
-	    std::string getName() const override                      \
-        { return #name;}                                     \
-	    void run() override;                                 \
-	    REGISTER_CLASS(name)                                 \
+	{                                                        \
+		std::string getName() const override                 \
+		{ return #name;}                                     \
+		void run() override;                                 \
+		REGISTER_CLASS(name)                                 \
 	};                                                       \
 	DEFINE_REG_CLASS(name)                                   \
 	void name::run()
@@ -154,7 +154,7 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 	NAME
 
 #define UNIT_TEST(...)                                       \
-	GET_MACRO(__VA_ARGS__, UNIT_TEST2, UNIT_TEST1)(__VA_ARGS__)
+	GET_MACRO(__VA_ARGS__, UNIT_TEST2, UNIT_TEST1, _1)(__VA_ARGS__)
 
 
 
@@ -162,26 +162,26 @@ std::list<std::pair<std::string, Registry::factoryMethod>> Registry::registry;
 // Main function, calling automatically all UNIT_TEST
 int main()
 {
-    size_t count = 0;
-    size_t countPassed = 0;
-    for(auto entry : Registry::getRegistry())
-    {
+	size_t count = 0;
+	size_t countPassed = 0;
+	for(auto entry : Registry::getRegistry())
+	{
 		const auto& constructor = entry.second;
 		auto* obj = constructor();
 
 		obj->run();
 		countPassed += obj->isPassed()?1:0;
 		count++;
-    }
+	}
 
 	if (count == countPassed)
-    {
+	{
 		std::cout << "ALL TEST PASSED: " << count << std::endl;
-    }
-    else
-    {
+	}
+	else
+	{
 		std::cout << "FAILED: " << countPassed << " passed of " << count << std::endl;
-    }
+	}
 
-    return 0;
+	return 0;
 }
