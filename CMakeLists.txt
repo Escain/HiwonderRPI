@@ -23,7 +23,7 @@ cmake_minimum_required( VERSION 3.0 )
 # Project name
 project ( "HiwonderRPI" )
 # C++17
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -pedantic")
 
 include_directories("src")
 
