@@ -6,7 +6,7 @@ How to use:
 
 1) Make sure you have git, g++, cmake and wiringPi installed:
 
-sudo apt-get install git g++ cmake wiringpi
+$ sudo apt-get install git g++ cmake wiringpi
 
 2) Make sure UART is activated on your RPI
 
@@ -19,9 +19,7 @@ $ sudo raspi-config
 
 3) Download the project
 
-$ mkdir hiwonder_rpi
-$ cd hiwonder_rpi
-$ git clone https://github.com/Escain/HiwonderRPI
+$ git clone https://github.com/Escain/HiwonderRPI ./hiwonder_rpi
 $ cd ..
 
 4) Configure the project
