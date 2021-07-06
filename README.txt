@@ -1,8 +1,12 @@
-# HiwonderRPI
-Raspberry PI library to control Hiwonder UART servos
+HiwonderRPI
+===========
 
 
-How to use:
+HiwonderRPI is a C++ library to control Hiwonder UART servos with a Raspberry PI. 
+Even if it uses some of the modern C++ features, it is designed with performance and usability in mind.
+
+Install & use
+-------------
 
 1) Make sure you have git, g++, cmake and wiringPi installed:
 
@@ -35,3 +39,24 @@ $ make
 6) Test something
 
 $ sudo ./hiwonder
+
+
+Feedback & Suggestions
+----------------------
+
+For any feedback or suggestion:
+
+https://github.com/Escain/HiwonderRPI/discussions
+
+Issues
+------
+
+If you found a bug or issue, feel free to open an issue at https://github.com/Escain/HiwonderRPI/issues
+
+If you are not sure it is an issue, feel free to open a feedback/discussion: https://github.com/Escain/HiwonderRPI/discussions
+
+Questions
+---------
+
+Please, prefer to post questions at https://www.stackoverflow.com or https://electronics.stackexchange.com and use the tag HiwonderRPI.
+This make them available for other users as well.
